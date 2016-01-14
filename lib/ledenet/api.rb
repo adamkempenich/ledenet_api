@@ -14,55 +14,112 @@ module LEDENET
 
     def on
       send_bytes_action(0x71, 0x23, 0x0F, 0xA3)
-
       true
     end
 
     def off
       send_bytes_action(0x71, 0x24 ,0x0F, 0xA4)
-
       true
     end
 
     def on?
-      (status.bytes[13] & 0x01) == 1
+      # Bulbs respond with "35" or "36" (HEX: 23 or 24)
+      # for on and off respectively
+      power_state = status[2].unpack('C').to_s.delete('[]')
+      if  power_state == "35"
+        true
+      else
+        false
+      end
     end
 
-    def update_color(r, g, b)
-      checksum = color_checksum(r, g, b)
 
-      send_bytes_action(0x31, r, g, b, 0xFF, 0, 0x0F, checksum)
+
+    def update_ufo(r,g,b,w,persist)
+      msg = Array.new
+      if persist
+        msg << 0x31
+      else
+        msg << 0x41 << r << g << b << w << 0x00 << 0x0f
+      end
+     
+      checksum = calc_checksum(msg)
+          
+      send_bytes_action(*msg, checksum)
 
       true
     end
 
-    def current_color
-      status.bytes[6, 3]
+    def update_bulb_color(r, g, b, persist)
+      msg = Array.new
+      if persist
+        msg << 0x31
+      else
+        msg << 0x41 << r << g << b << 0x00 << 0xf0 << 0x0f
+      end
+      checksum = calc_checksum(msg)
+      send_bytes_action(*msg, checksum)
+
+      true
+    end
+
+    def update_bulb_white(w, persist)
+    msg = Array.new
+    if persist
+        msg << 0x31
+      else
+        msg << 0x41 << 0x00 << 0x00 << 0x00 << w << 0x0f << 0x0f
+      end
+        checksum = calc_checksum(msg)
+        send_bytes_action(*msg, checksum)
+
+        true
+    end
+
+    def current_status
+      # Gets bytes 6-9 and returns them as Integers from 0-255 (Red,Green,Blue, and WW)
+      current_packet = Array.new
+      current_packet = status
+      power_state = "off"
+      power_state = "on" if current_packet[2].unpack('C').to_s.delete('[]') == "35"
+      return Integer(current_packet[6].unpack('C').to_s.delete('[]')).to_i,Integer(current_packet[7].unpack('C').to_s.delete('[]')).to_i,Integer(current_packet[8].unpack('C').to_s.delete('[]')).to_i,Integer(current_packet[9].unpack('C').to_s.delete('[]')).to_i, power_state
+      # Returns RGBW and Power "On" or "Off"
     end
 
     def reconnect!
       create_socket
     end
 
+    def getStatus # Function to get status only
+      status
+    end
+
+    def getInfo
+      msg = Array.new
+      current_packet = Array.new
+      current_packet = status
+      msg << Integer(current_packet.each { |x| puts x }.unpack('C').to_s.delete('[]'))
+    end
+
     private
-      def color_checksum(r, g, b)
-        (r + g + b + 0x3F) % 0x100
+      def calc_checksum(bytes)
+        bytes.inject{|sum,x| sum + x } % 0x100
       end
 
       def status
         socket_action do
-          send_bytes(0x81, 0x8A, 0x8B, 0x96)
-
-          # Example response:
-          # [129, 4, 35, 97, 33, 9, 11, 22, 33, 255, 3, 0, 0, 119]
-          #                         R   G   B   WW            ^--- LSB indicates on/off
+          msg = Array.new
+          msg << 0x81 << 0x8A << 0x8B
+          msg <<  calc_checksum(msg)
+          send_bytes(*msg)
           flush_response(14)
         end
       end
 
       def flush_response(msg_length)
-        @socket.recv(msg_length, Socket::MSG_WAITALL)
+        @socket.recv(msg_length,Socket::MSG_WAITALL)
       end
+
 
       def send_bytes(*b)
         @socket.write(b.pack('c*'))
