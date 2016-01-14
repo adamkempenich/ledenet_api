@@ -82,6 +82,13 @@ module LEDENET
       return Integer(current_packet[6].unpack('C').to_s.delete('[]')).to_i,Integer(current_packet[7].unpack('C').to_s.delete('[]')).to_i,Integer(current_packet[8].unpack('C').to_s.delete('[]')).to_i,Integer(current_packet[9].unpack('C').to_s.delete('[]')).to_i, power_state
     end
 
+    def current_color
+      current_packet = Array.new
+      current_packet = status
+      currentColors = Array.new
+      currentColors << Integer(current_packet[6].unpack('C').to_s.delete('[]')).to_i << Integer(current_packet[7].unpack('C').to_s.delete('[]')).to_i << Integer(current_packet[8].unpack('C').to_s.delete('[]')).to_i
+    end
+    
     def reconnect!
       create_socket
     end
