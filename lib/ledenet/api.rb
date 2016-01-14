@@ -33,24 +33,24 @@ module LEDENET
       end
     end
 
+    def update_color(r,g,b) # Supports legacy color Updates
+      update_ufo(r,g,b,0,false)
+      true
+    end
 
-
-    def update_ufo(r,g,b,w,persist)
+    def update_ufo(r,g,b,w,persist) # Update a UFO wireless device
       msg = Array.new
       if persist
         msg << 0x31
       else
         msg << 0x41 << r << g << b << w << 0x00 << 0x0f
       end
-     
       checksum = calc_checksum(msg)
-          
       send_bytes_action(*msg, checksum)
-
       true
     end
 
-    def update_bulb_color(r, g, b, persist)
+    def update_bulb_color(r, g, b, persist) # Update a Bulb wireless device's color
       msg = Array.new
       if persist
         msg << 0x31
@@ -59,11 +59,10 @@ module LEDENET
       end
       checksum = calc_checksum(msg)
       send_bytes_action(*msg, checksum)
-
       true
     end
 
-    def update_bulb_white(w, persist)
+    def update_bulb_white(w, persist) # Update a Bulb wireless device's WW level
     msg = Array.new
     if persist
         msg << 0x31
@@ -72,26 +71,19 @@ module LEDENET
       end
         checksum = calc_checksum(msg)
         send_bytes_action(*msg, checksum)
-
         true
     end
 
-    def current_status
-      # Gets bytes 6-9 and returns them as Integers from 0-255 (Red,Green,Blue, and WW)
+    def current_status # Gets bytes 6-9 and returns them as Integers from 0-255 (Red,Green,Blue, and WW) and return power status as string
       current_packet = Array.new
       current_packet = status
       power_state = "off"
       power_state = "on" if current_packet[2].unpack('C').to_s.delete('[]') == "35"
       return Integer(current_packet[6].unpack('C').to_s.delete('[]')).to_i,Integer(current_packet[7].unpack('C').to_s.delete('[]')).to_i,Integer(current_packet[8].unpack('C').to_s.delete('[]')).to_i,Integer(current_packet[9].unpack('C').to_s.delete('[]')).to_i, power_state
-      # Returns RGBW and Power "On" or "Off"
     end
 
     def reconnect!
       create_socket
-    end
-
-    def getStatus # Function to get status only
-      status
     end
 
     def getInfo
